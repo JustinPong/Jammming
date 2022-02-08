@@ -1,4 +1,4 @@
-# Jammming
+# Jammming(CodeCademy Project)
 
 An education app that will allow users to save songs to a playlist<br/>
 TECHNOLOGIES — HTML, CSS, React, API, Flexbox<br/>
