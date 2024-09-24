@@ -14,7 +14,6 @@ class SearchBar extends React.Component {
 
   search(event) {
     event.preventDefault();
-    console.log("Search triggered");
     this.props.onSearch(this.state.term);
   }
 

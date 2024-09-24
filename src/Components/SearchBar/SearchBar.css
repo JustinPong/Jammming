@@ -14,12 +14,11 @@
 
 .SearchBar input {
   width: 287px;
-  padding: 0.88rem 0;
+  padding: 1rem;
   border: 1px solid #fff;
   border-radius: 3px;
   margin-bottom: 2.22rem;
   color: #010c3f;
-  text-align: center;
   font-size: 1rem;
 }
 
