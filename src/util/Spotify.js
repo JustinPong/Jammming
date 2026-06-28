@@ -1,8 +1,9 @@
 let accessToken = "";
 const clientId = "351c6be9234b4dbe8dfe8fbfe60efce7";
 const redirectUri =
-  window.location.hostname === "localhost"
-    ? "http://localhost:3000/"
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:3000/"
     : "https://justinpong.github.io/Jammming/";
 
 function generateRandomString(length) {
