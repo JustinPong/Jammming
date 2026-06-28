@@ -5,27 +5,72 @@ const redirectUri =
     ? "http://localhost:3000/"
     : "https://justinpong.github.io/Jammming/";
 
+function generateRandomString(length) {
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(values).map((x) => possible[x % possible.length]).join("");
+}
+
+async function generateCodeChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
 const Spotify = {
-  getAccessToken() {
+  async getAccessToken() {
     if (accessToken) {
       return accessToken;
     }
 
-    const accessTokenMatch = window.location.href.match(/access_token=([^&]*)/);
-    const expiresInMatch = window.location.href.match(/expires_in=([^&]*)/);
-    if (accessTokenMatch && expiresInMatch) {
-      accessToken = accessTokenMatch[1];
-      const expiresIn = Number(expiresInMatch[1]);
-      window.setTimeout(() => (accessToken = ""), expiresIn * 1000);
-      window.history.pushState("Access Token", null, redirectUri);
-    } else {
-      const accessUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&scope=playlist-modify-public&redirect_uri=${redirectUri}`;
-      window.location = accessUrl;
+    // PKCE callback: exchange code for token
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      const verifier = sessionStorage.getItem("pkce_verifier");
+      sessionStorage.removeItem("pkce_verifier");
+
+      const body = new URLSearchParams({
+        client_id: clientId,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+      });
+
+      const response = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+
+      const json = await response.json();
+      accessToken = json.access_token;
+      window.setTimeout(() => (accessToken = ""), json.expires_in * 1000);
+      window.history.replaceState({}, "", redirectUri);
+      return accessToken;
     }
+
+    // Initiate PKCE flow
+    const verifier = generateRandomString(64);
+    const challenge = await generateCodeChallenge(verifier);
+    sessionStorage.setItem("pkce_verifier", verifier);
+
+    const authUrl = new URL("https://accounts.spotify.com/authorize");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("scope", "playlist-modify-public");
+    authUrl.searchParams.set("code_challenge_method", "S256");
+    authUrl.searchParams.set("code_challenge", challenge);
+    window.location = authUrl.toString();
   },
 
-  search(term) {
-    const accessToken = Spotify.getAccessToken();
+  async search(term) {
+    const accessToken = await Spotify.getAccessToken();
     return fetch(`https://api.spotify.com/v1/search?type=track&q=${term}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -47,11 +92,11 @@ const Spotify = {
       });
   },
 
-  savePlaylist(name, trackUris) {
+  async savePlaylist(name, trackUris) {
     if (!name && !trackUris) {
       return;
     } else {
-      const accessToken = Spotify.getAccessToken();
+      const accessToken = await Spotify.getAccessToken();
       const headers = {
         Authorization: `Bearer ${accessToken}`,
       };
